@@ -243,33 +243,83 @@ function ask(){
 }
 ask();
 
+  const esc=t=>String(t==null?"":t).replace(/[&<>"]/g,c=>({
+  "&":"&amp;",
+  "<":"&lt;",
+  ">":"&gt;",
+  '"':"&quot;"
+}[c]));
 
-const esc=t=>String(t==null?"":t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let ac=null;
 $("#go").onclick=async()=>{
-  const text=$("#src").value.trim(),lang=$("#lang").value,out=$("#out");
+  const text=$("#src").value.trim();
+  const lang=$("#lang").value;
+  const out=$("#out");
+
   out.className="glass out show";
-  if(!text){out.innerHTML='<p class="note">Enter some English text first.</p>';return}
+
+  if(!text){
+    out.innerHTML='<p class="note">Enter some English text first.</p>';
+    return;
+  }
+
+  const languageCodes={
+    "Turkish":"tr",
+    "Kazakh":"kk",
+    "Kyrgyz":"ky",
+    "Uzbek":"uz",
+    "Azerbaijani":"az",
+    "Tatar":"tt",
+    "Turkmen":"tk"
+  };
+
+  const target=languageCodes[lang];
+
   out.innerHTML='<p class="note"><span class="spin"></span>Translating…</p>';
-  let sample=null;
-  try{sample=await claude.use("sample")}catch(e){}
-  if(!sample){out.innerHTML='<p class="note">AI translation works when this page is opened in claude.ai.</p>';return}
-  if(ac)ac.abort();ac=new AbortController();
-  const prompt="You are a Turkic-language translator and etymologist.\nTranslate the English text below into "+lang+", preferring native Turkic vocabulary over Arabic, Persian or Western loanwords where natural.\nReturn ONLY JSON: {\"translation\":string,\"words\":[{\"en\":string,\"tr\":string,\"native\":boolean}],\"loanwords\":[{\"word\":string,\"turkic\":string,\"note\":string}]}\n- words: key content words of the text in order (max 24); tr is the "+lang+" equivalent; native is true if that word is of Turkic origin.\n- loanwords: English words in the text that English borrowed from a Turkic language (empty array if none); turkic is the source word; note is a short origin note.\nText:\n<text>"+text.slice(0,1500)+"</text>";
+
   try{
-    const r=await sample.json(prompt,{signal:ac.signal,cache:false});
-    const w=(r.words||[]).map(x=>'<span class="pair '+(x.native?"own":"")+'"><b>'+esc(x.tr)+'</b> <span>'+esc(x.en)+'</span></span>').join("");
-    const l=(r.loanwords||[]).map(x=>'<span class="pair own"><b>'+esc(x.word)+'</b> <span>← '+esc(x.turkic)+'. '+esc(x.note)+'</span></span>').join("");
-    out.innerHTML='<div><p class="note" style="margin-bottom:8px">'+esc(lang)+'</p><div class="tr">'+esc(r.translation)+'</div></div>'
-      +(w?'<div><p class="note" style="margin-bottom:8px">Word by word. Outlined words are native Turkic.</p><div class="pairs">'+w+'</div></div>':"")
-      +'<div><p class="note" style="margin-bottom:8px">Turkic loanwords found in your English text</p>'+(l?'<div class="pairs">'+l+'</div>':'<p class="note">None found.</p>')+'</div>';
+    const url=
+      "https://api.mymemory.translated.net/get?q="+
+      encodeURIComponent(text.slice(0,5000))+
+      "&langpair=en|"+target;
+
+    const response=await fetch(url);
+
+    if(!response.ok){
+      throw new Error("API error");
+    }
+
+    const data=await response.json();
+
+    if(!data.responseData || !data.responseData.translatedText){
+      throw new Error("No translation");
+    }
+
+    const translation=data.responseData.translatedText;
+
+    out.innerHTML=
+      '<div>'+
+        '<p class="note" style="margin-bottom:8px">'+
+          'English → '+esc(lang)+
+        '</p>'+
+        '<div class="tr">'+
+          esc(translation)+
+        '</div>'+
+      '</div>'+
+      '<div>'+
+        '<p class="note">'+
+          'Translation powered by MyMemory.'+
+        '</p>'+
+      '</div>';
+
   }catch(e){
-    const c=e&&e.code;
-    out.innerHTML='<p class="note">'+(c==="not_granted"?"Allow AI access to translate.":c==="cancelled"?"Cancelled.":c==="rate_limited"?"Too many requests. Wait a moment and try again.":"Translation failed. Try again.")+'</p>';
+    out.innerHTML=
+      '<p class="note">'+
+      'Translation failed. Please try again in a moment.'+
+      '</p>';
   }
 };
 
-$("#theme").onclick=()=>{const r=document.documentElement;
+{const r=document.documentElement;
   const dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;
   r.dataset.theme=dark?"light":"dark"};
 </script>
