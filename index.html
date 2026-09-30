@@ -7,6 +7,21 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
 <style>
+  .translator-box{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+}
+
+.translator-box textarea{
+  min-height:220px;
+}
+
+@media(max-width:700px){
+  .translator-box{
+    grid-template-columns:1fr;
+  }
+}
 :root{
   box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
   --bg1:#f5f5f7;--bg2:#e3e3e8;--bg3:#fafafa;
@@ -163,20 +178,65 @@ textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outl
     <div class="glass quiz" id="qz"></div>
   </section>
 
-  <section id="analyzer">
-    <h2>Text Analyzer</h2>
-    <p class="sub">Paste English text. AI translates it into a Turkic language, pairs each word with its Turkic equivalent and flags words English borrowed from Turkic.</p>
-    <div class="glass an">
-      <textarea id="src" aria-label="English text" placeholder="Paste a sentence or a short paragraph in English">The khan drank yogurt in his garden kiosk while the horde camped beyond the hills.</textarea>
-      <div class="row">
-        <select id="lang" aria-label="Target language">
-          <option>Turkish</option><option>Kazakh</option><option>Kyrgyz</option><option>Uzbek</option><option>Azerbaijani</option><option>Tatar</option><option>Turkmen</option>
-        </select>
-        <button class="btn pri" id="go">Translate with AI</button>
-      </div>
+  <section id="translator">
+  <h2>Translator</h2>
+  <p class="sub">Translate text between English and Turkic languages.</p>
+
+  <div class="glass an">
+
+    <div class="row">
+      <select id="fromLang" aria-label="Source language">
+        <option value="en">English</option>
+        <option value="tr">Turkish</option>
+        <option value="kk">Kazakh</option>
+        <option value="ky">Kyrgyz</option>
+        <option value="uz">Uzbek</option>
+        <option value="az">Azerbaijani</option>
+        <option value="tt">Tatar</option>
+        <option value="tk">Turkmen</option>
+      </select>
+
+      <button class="btn" id="swapLang" type="button">⇄</button>
+
+      <select id="toLang" aria-label="Target language">
+        <option value="tr">Turkish</option>
+        <option value="en">English</option>
+        <option value="kk">Kazakh</option>
+        <option value="ky">Kyrgyz</option>
+        <option value="uz">Uzbek</option>
+        <option value="az">Azerbaijani</option>
+        <option value="tt">Tatar</option>
+        <option value="tk">Turkmen</option>
+      </select>
     </div>
-    <div class="glass out" id="out" aria-live="polite"></div>
-  </section>
+
+    <div class="translator-box">
+      <textarea
+        id="translateInput"
+        placeholder="Enter text..."
+      ></textarea>
+
+      <textarea
+        id="translateOutput"
+        placeholder="Translation"
+        readonly
+      ></textarea>
+    </div>
+
+    <div class="row">
+      <button class="btn pri" id="translateBtn" type="button">
+        Translate
+      </button>
+
+      <button class="btn" id="clearTranslate" type="button">
+        Clear
+      </button>
+    </div>
+
+    <p class="note" id="translateStatus"></p>
+
+  </div>
+</section>
 </main>
 <footer>An educational reader on Turkic loanwords in English letters.</footer>
 
@@ -243,85 +303,106 @@ function ask(){
 }
 ask();
 
-  const esc=t=>String(t==null?"":t).replace(/[&<>"]/g,c=>({
-  "&":"&amp;",
-  "<":"&lt;",
-  ">":"&gt;",
-  '"':"&quot;"
-}[c]));
-
-$("#go").onclick=async()=>{
-  const text=$("#src").value.trim();
-  const lang=$("#lang").value;
-  const out=$("#out");
-
-  out.className="glass out show";
-
-  if(!text){
-    out.innerHTML='<p class="note">Enter some English text first.</p>';
-    return;
-  }
-
-  const languageCodes={
-    "Turkish":"tr",
-    "Kazakh":"kk",
-    "Kyrgyz":"ky",
-    "Uzbek":"uz",
-    "Azerbaijani":"az",
-    "Tatar":"tt",
-    "Turkmen":"tk"
-  };
-
-  const target=languageCodes[lang];
-
-  out.innerHTML='<p class="note"><span class="spin"></span>Translating…</p>';
-
-  try{
-    const url=
-      "https://api.mymemory.translated.net/get?q="+
-      encodeURIComponent(text.slice(0,5000))+
-      "&langpair=en|"+target;
-
-    const response=await fetch(url);
-
-    if(!response.ok){
-      throw new Error("API error");
-    }
-
-    const data=await response.json();
-
-    if(!data.responseData || !data.responseData.translatedText){
-      throw new Error("No translation");
-    }
-
-    const translation=data.responseData.translatedText;
-
-    out.innerHTML=
-      '<div>'+
-        '<p class="note" style="margin-bottom:8px">'+
-          'English → '+esc(lang)+
-        '</p>'+
-        '<div class="tr">'+
-          esc(translation)+
-        '</div>'+
-      '</div>'+
-      '<div>'+
-        '<p class="note">'+
-          'Translation powered by MyMemory.'+
-        '</p>'+
-      '</div>';
-
-  }catch(e){
-    out.innerHTML=
-      '<p class="note">'+
-      'Translation failed. Please try again in a moment.'+
-      '</p>';
-  }
-};
+  
 
 {const r=document.documentElement;
   const dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;
   r.dataset.theme=dark?"light":"dark"};
+
+  const fromLang = $("#fromLang");
+const toLang = $("#toLang");
+const translateInput = $("#translateInput");
+const translateOutput = $("#translateOutput");
+const translateBtn = $("#translateBtn");
+const clearTranslate = $("#clearTranslate");
+const swapLang = $("#swapLang");
+const translateStatus = $("#translateStatus");
+
+translateBtn.onclick = async () => {
+
+  const text = translateInput.value.trim();
+
+  if(!text){
+    translateStatus.textContent = "Enter some text first.";
+    return;
+  }
+
+  const from = fromLang.value;
+  const to = toLang.value;
+
+  if(from === to){
+    translateOutput.value = text;
+    translateStatus.textContent = "The languages are the same.";
+    return;
+  }
+
+  translateBtn.disabled = true;
+  translateBtn.textContent = "Translating...";
+  translateStatus.textContent = "";
+  translateOutput.value = "";
+
+  try{
+
+    const url =
+      "https://api.mymemory.translated.net/get?q=" +
+      encodeURIComponent(text) +
+      "&langpair=" +
+      encodeURIComponent(from + "|" + to);
+
+    const response = await fetch(url);
+
+    if(!response.ok){
+      throw new Error("Translation request failed");
+    }
+
+    const data = await response.json();
+
+    const result = data?.responseData?.translatedText;
+
+    if(!result){
+      throw new Error("No translation returned");
+    }
+
+    translateOutput.value = result;
+
+  }catch(error){
+
+    translateStatus.textContent =
+      "Translation failed. Please try again.";
+
+  }finally{
+
+    translateBtn.disabled = false;
+    translateBtn.textContent = "Translate";
+
+  }
+};
+
+
+swapLang.onclick = () => {
+
+  const oldFrom = fromLang.value;
+
+  fromLang.value = toLang.value;
+  toLang.value = oldFrom;
+
+  if(translateOutput.value){
+    const oldText = translateInput.value;
+
+    translateInput.value = translateOutput.value;
+    translateOutput.value = oldText;
+  }
+};
+
+
+clearTranslate.onclick = () => {
+
+  translateInput.value = "";
+  translateOutput.value = "";
+  translateStatus.textContent = "";
+
+  translateInput.focus();
+};
 </script>
 </body>
 </html>
